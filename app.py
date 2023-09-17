@@ -7,38 +7,11 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-POS = ["GK", "DEF", "MID", "FWD"]
-
-POS_ID_TO_NAME = {k + 1: v for k, v in enumerate(POS)}
-POS_NAME_TO_ID = {v: k + 1 for k, v in enumerate(POS)}
-
-TEAMS = [
-    "ARS",
-    "AVL",
-    "BOU",
-    "BRE",
-    "BHA",
-    "BUR",
-    "CHE",
-    "CRY",
-    "EVE",
-    "FUL",
-    "LIV",
-    "LUT",
-    "MCI",
-    "MUN",
-    "NEW",
-    "NFO",
-    "SHU",
-    "TOT",
-    "WHU",
-    "WOL",
-]
-
-TEAMS_ID_TO_NAME = {k + 1: v for k, v in enumerate(TEAMS)}
-TEAMS_NAME_TO_ID = {v: k + 1 for k, v in enumerate(TEAMS)}
+from constants import POS_ID_TO_NAME, POS_NAME_TO_ID, TEAMS_NAME_TO_ID, TEAMS_ID_TO_NAME, TEAM_FULL_NAME_TO_ABBR
 
 OFFICIAL_STATS_URL = "https://fantasy.premierleague.com/api/bootstrap-static/"
+
+VAASTAV_CSV_URL = "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data/2023-24/gws/gw{gw}.csv"
 
 
 @st.cache_data(ttl="6h")
@@ -50,6 +23,21 @@ def get_official_stats() -> Dict:
     """
     response = httpx.get(OFFICIAL_STATS_URL)
     return loads(response.text)
+
+
+@st.cache_data(ttl="6h")
+def get_current_gw() -> int:
+    """Get the current game week from the official stats
+
+    Returns:
+        int: 1-based game week count
+    """
+
+    stats = get_official_stats()
+
+    events = stats.get("events", [])
+
+    return max(_["id"] for _ in events if _["is_current"])
 
 
 def preprocess_players_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -110,7 +98,7 @@ def preprocess_players_df(df: pd.DataFrame) -> pd.DataFrame:
             "influence_rank",
             "influence_rank_type",
         ],
-        1,
+        axis=1,
     )
 
     df = df.rename(
@@ -131,15 +119,64 @@ def preprocess_players_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def get_gw_stats(gw: int):
+    df = pd.read_csv(VAASTAV_CSV_URL.format(gw=gw))
+    df["team"] = df["team"].map(TEAM_FULL_NAME_TO_ABBR)
+
+    df = df.rename(
+        {
+            "name": "Player",
+            "position": "POS",
+            "team": "Team"
+        },
+        axis=1,
+    )
+
+    df = df.set_index("Player")
+
+    return df
+
+
+def increment_stat_gw(increment: int = 1) -> None:
+    st.session_state["stat_gw"] += increment
+
+
+def get_official_df() -> pd.DataFrame:
+
+    response = get_official_stats()
+
+    df = pd.DataFrame(response["elements"])
+
+    df = preprocess_players_df(df)
+
+    return df
+
+
+def combine_df(df_filtered: pd.DataFrame, df_gw_stats: pd.DataFrame) -> pd.DataFrame:
+    df_combined = df_filtered[["Price Change", "Price", "xPoint This GW"]].join(df_gw_stats)
+    df_combined = df_combined.rename({
+        "Price Change": f"Price Change (GW{st.session_state['current_gw'] - 1} to GW{st.session_state['current_gw']})",
+        "Price": f"Price (GW{st.session_state['current_gw']})",
+        "xPoint This GW": f"xPoint (GW{st.session_state['current_gw']})"
+    }, axis=1)
+
+    return df_combined
+
+
 def main() -> None:
     """Render webapp."""
     st.title("FPL Stats")
 
-    response = get_official_stats()
+    if "current_gw" not in st.session_state:
+        current_gw = get_current_gw()
+        stat_gw = current_gw - 1
+        st.session_state["current_gw"] = current_gw
+        st.session_state["stat_gw"] = current_gw - 1
+    else:
+        current_gw = st.session_state["current_gw"]
+        stat_gw = st.session_state["stat_gw"]
 
-    all_players = pd.DataFrame(response["elements"])
-
-    all_players = preprocess_players_df(all_players)
+    st.subheader(f"Game Week {current_gw}")
 
     pos = st.multiselect(label="Position", options=POS, default=POS)
     team = st.multiselect(label="Team", options=TEAMS, default=TEAMS)
@@ -148,32 +185,53 @@ def main() -> None:
     doubt = st.checkbox("Include Player in Doubt?", value=False)
     price_range = st.slider(
         "Price Range",
-        float(all_players["Price"].min()),
-        float(all_players["Price"].max()),
-        (float(all_players["Price"].min()), float(all_players["Price"].max())),
+        float(df_all_players["Price"].min()),
+        float(df_all_players["Price"].max()),
+        (float(df_all_players["Price"].min()), float(df_all_players["Price"].max())),
         step=0.1,
     )
 
-    all_players = all_players[all_players["POS"].isin(pos)]
-    all_players = all_players[all_players["Team"].isin(team)]
+    df_filtered = df_all_players[df_all_players["POS"].isin(pos)]
+    df_filtered = df_filtered[df_filtered["Team"].isin(team)]
+
+    df_gw_stats = get_gw_stats(stat_gw)
+    df_gw_stats = df_gw_stats[df_gw_stats["POS"].isin(pos)]
+    df_gw_stats = df_gw_stats[df_gw_stats["Team"].isin(team)]
 
     if not injured:
-        all_players = all_players[all_players["Status"] != "i"]
+        df_filtered = df_filtered[df_filtered["Status"] != "i"]
 
     if not unavailable:
-        all_players = all_players[all_players["Status"] != "u"]
+        df_filtered = df_filtered[df_filtered["Status"] != "u"]
 
     if not doubt:
-        all_players = all_players[all_players["Status"] != "d"]
+        df_filtered = df_filtered[df_filtered["Status"] != "d"]
 
-    all_players = all_players[
-        (all_players["Price"] >= price_range[0])
-        & (all_players["Price"] <= price_range[1])
+    df_filtered = df_filtered[
+        (df_filtered["Price"] >= price_range[0])
+        & (df_filtered["Price"] <= price_range[1])
     ]
 
-    st.dataframe(all_players)
+    st.subheader("Stats History")
+
+    _ = st.columns((1.5, 3, 1.2, 3, 1.5))
+    _[0].button("⬅️ Previous Game Week", on_click=increment_stat_gw, args=(-1,), disabled=stat_gw <= 1)
+    _[2].caption(f"Stats from Game Week {stat_gw}")
+    _[-1].button("Next Game Week ➡️", on_click=increment_stat_gw, disabled=stat_gw >= current_gw - 1)
+
+    df_combined = combine_df(df_filtered, df_gw_stats)
+
+    st.dataframe(
+        combine_df(df_filtered=df_filtered, df_gw_stats=df_gw_stats)
+    )
 
 
 if __name__ == "__main__":
     st.set_page_config(page_title="FPL Stats", page_icon="⚽", layout="wide")
+
+    POS = POS_NAME_TO_ID.keys()
+    TEAMS = TEAMS_NAME_TO_ID.keys()
+
+    df_all_players = get_official_df()
+
     main()
