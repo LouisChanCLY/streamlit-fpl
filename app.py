@@ -153,11 +153,12 @@ def get_official_df() -> pd.DataFrame:
 
 
 def combine_df(df_filtered: pd.DataFrame, df_gw_stats: pd.DataFrame) -> pd.DataFrame:
-    df_combined = df_filtered[["Price Change", "Price", "xPoint This GW"]].join(df_gw_stats)
+    df_combined = df_filtered[["Price Change", "Price", "xPoint This GW", "Dream Team Last Week?"]].join(df_gw_stats)
     df_combined = df_combined.rename({
         "Price Change": f"Price Change (GW{st.session_state['current_gw'] - 1} to GW{st.session_state['current_gw']})",
         "Price": f"Price (GW{st.session_state['current_gw']})",
-        "xPoint This GW": f"xPoint (GW{st.session_state['current_gw']})"
+        "xPoint This GW": f"xPoint (GW{st.session_state['current_gw']})",
+        "Dream Team Last Week?": f"Dream Team GW{st.session_state['current_gw'] - 1}"
     }, axis=1)
 
     return df_combined
