@@ -7,7 +7,13 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from constants import POS_ID_TO_NAME, POS_NAME_TO_ID, TEAMS_NAME_TO_ID, TEAMS_ID_TO_NAME, TEAM_FULL_NAME_TO_ABBR
+from constants import (
+    POS_ID_TO_NAME,
+    POS_NAME_TO_ID,
+    TEAMS_NAME_TO_ID,
+    TEAMS_ID_TO_NAME,
+    TEAM_FULL_NAME_TO_ABBR,
+)
 
 OFFICIAL_STATS_URL = "https://fantasy.premierleague.com/api/bootstrap-static/"
 
@@ -37,7 +43,11 @@ def get_current_gw() -> int:
 
     events = stats.get("events", [])
 
-    return max(_["id"] for _ in events if _["is_current"])
+    return max(
+        (_["id"] if not _["finished"] else (_["id"] + 1))
+        for _ in events
+        if _["is_current"]
+    )
 
 
 def preprocess_players_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -124,11 +134,7 @@ def get_gw_stats(gw: int):
     df["team"] = df["team"].map(TEAM_FULL_NAME_TO_ABBR)
 
     df = df.rename(
-        {
-            "name": "Player",
-            "position": "POS",
-            "team": "Team"
-        },
+        {"name": "Player", "position": "POS", "team": "Team"},
         axis=1,
     )
 
@@ -142,7 +148,6 @@ def increment_stat_gw(increment: int = 1) -> None:
 
 
 def get_official_df() -> pd.DataFrame:
-
     response = get_official_stats()
 
     df = pd.DataFrame(response["elements"])
@@ -153,13 +158,18 @@ def get_official_df() -> pd.DataFrame:
 
 
 def combine_df(df_filtered: pd.DataFrame, df_gw_stats: pd.DataFrame) -> pd.DataFrame:
-    df_combined = df_filtered[["Price Change", "Price", "xPoint This GW", "Dream Team Last Week?"]].join(df_gw_stats)
-    df_combined = df_combined.rename({
-        "Price Change": f"Price Change (GW{st.session_state['current_gw'] - 1} to GW{st.session_state['current_gw']})",
-        "Price": f"Price (GW{st.session_state['current_gw']})",
-        "xPoint This GW": f"xPoint (GW{st.session_state['current_gw']})",
-        "Dream Team Last Week?": f"Dream Team GW{st.session_state['current_gw'] - 1}"
-    }, axis=1)
+    df_combined = df_filtered[
+        ["Price Change", "Price", "xPoint This GW", "Dream Team Last Week?"]
+    ].join(df_gw_stats)
+    df_combined = df_combined.rename(
+        {
+            "Price Change": f"Price Change (GW{st.session_state['current_gw'] - 1} to GW{st.session_state['current_gw']})",
+            "Price": f"Price (GW{st.session_state['current_gw']})",
+            "xPoint This GW": f"xPoint (GW{st.session_state['current_gw']})",
+            "Dream Team Last Week?": f"Dream Team GW{st.session_state['current_gw'] - 1}",
+        },
+        axis=1,
+    )
 
     return df_combined
 
@@ -216,15 +226,22 @@ def main() -> None:
     st.subheader("Stats History")
 
     _ = st.columns((1.5, 3, 1.2, 3, 1.5))
-    _[0].button("⬅️ Previous Game Week", on_click=increment_stat_gw, args=(-1,), disabled=stat_gw <= 1)
+    _[0].button(
+        "⬅️ Previous Game Week",
+        on_click=increment_stat_gw,
+        args=(-1,),
+        disabled=stat_gw <= 1,
+    )
     _[2].caption(f"Stats from Game Week {stat_gw}")
-    _[-1].button("Next Game Week ➡️", on_click=increment_stat_gw, disabled=stat_gw >= current_gw - 1)
+    _[-1].button(
+        "Next Game Week ➡️",
+        on_click=increment_stat_gw,
+        disabled=stat_gw >= current_gw - 1,
+    )
 
     df_combined = combine_df(df_filtered, df_gw_stats)
 
-    st.dataframe(
-        combine_df(df_filtered=df_filtered, df_gw_stats=df_gw_stats)
-    )
+    st.dataframe(combine_df(df_filtered=df_filtered, df_gw_stats=df_gw_stats))
 
 
 if __name__ == "__main__":
