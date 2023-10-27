@@ -241,7 +241,12 @@ def main() -> None:
 
     df_combined = combine_df(df_filtered, df_gw_stats)
 
-    st.dataframe(combine_df(df_filtered=df_filtered, df_gw_stats=df_gw_stats))
+    # Show the df broken down by player positions
+    tabs = st.tabs(POS_NAME_TO_ID.keys())
+
+    for t, p in zip(tabs, POS_NAME_TO_ID.keys()):
+        with t:
+            st.dataframe(df_combined[df_combined["POS"] == p].drop(["POS"], axis=1))
 
 
 if __name__ == "__main__":
