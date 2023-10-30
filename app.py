@@ -6,6 +6,7 @@ import httpx
 import numpy as np
 import pandas as pd
 import streamlit as st
+import urllib
 
 from constants import (
     POS_ID_TO_NAME,
@@ -205,48 +206,52 @@ def main() -> None:
     df_filtered = df_all_players[df_all_players["POS"].isin(pos)]
     df_filtered = df_filtered[df_filtered["Team"].isin(team)]
 
-    df_gw_stats = get_gw_stats(stat_gw)
-    df_gw_stats = df_gw_stats[df_gw_stats["POS"].isin(pos)]
-    df_gw_stats = df_gw_stats[df_gw_stats["Team"].isin(team)]
+    try:
+        df_gw_stats = get_gw_stats(stat_gw)
+        df_gw_stats = df_gw_stats[df_gw_stats["POS"].isin(pos)]
+        df_gw_stats = df_gw_stats[df_gw_stats["Team"].isin(team)]
 
-    if not injured:
-        df_filtered = df_filtered[df_filtered["Status"] != "i"]
+        if not injured:
+            df_filtered = df_filtered[df_filtered["Status"] != "i"]
 
-    if not unavailable:
-        df_filtered = df_filtered[df_filtered["Status"] != "u"]
+        if not unavailable:
+            df_filtered = df_filtered[df_filtered["Status"] != "u"]
 
-    if not doubt:
-        df_filtered = df_filtered[df_filtered["Status"] != "d"]
+        if not doubt:
+            df_filtered = df_filtered[df_filtered["Status"] != "d"]
 
-    df_filtered = df_filtered[
-        (df_filtered["Price"] >= price_range[0])
-        & (df_filtered["Price"] <= price_range[1])
-    ]
+        df_filtered = df_filtered[
+            (df_filtered["Price"] >= price_range[0])
+            & (df_filtered["Price"] <= price_range[1])
+        ]
 
-    st.subheader("Stats History")
+        st.subheader("Stats History")
 
-    _ = st.columns((1.5, 3, 1.2, 3, 1.5))
-    _[0].button(
-        "⬅️ Previous Game Week",
-        on_click=increment_stat_gw,
-        args=(-1,),
-        disabled=stat_gw <= 1,
-    )
-    _[2].caption(f"Stats from Game Week {stat_gw}")
-    _[-1].button(
-        "Next Game Week ➡️",
-        on_click=increment_stat_gw,
-        disabled=stat_gw >= current_gw - 1,
-    )
+        _ = st.columns((1.5, 3, 1.2, 3, 1.5))
+        _[0].button(
+            "⬅️ Previous Game Week",
+            on_click=increment_stat_gw,
+            args=(-1,),
+            disabled=stat_gw <= 1,
+        )
+        _[2].caption(f"Stats from Game Week {stat_gw}")
+        _[-1].button(
+            "Next Game Week ➡️",
+            on_click=increment_stat_gw,
+            disabled=stat_gw >= current_gw - 1,
+        )
 
-    df_combined = combine_df(df_filtered, df_gw_stats)
+        df_combined = combine_df(df_filtered, df_gw_stats)
 
-    # Show the df broken down by player positions
-    tabs = st.tabs(POS_NAME_TO_ID.keys())
+        # Show the df broken down by player positions
+        tabs = st.tabs(POS_NAME_TO_ID.keys())
 
-    for t, p in zip(tabs, POS_NAME_TO_ID.keys()):
-        with t:
-            st.dataframe(df_combined[df_combined["POS"] == p].drop(["POS"], axis=1))
+        for t, p in zip(tabs, POS_NAME_TO_ID.keys()):
+            with t:
+                st.dataframe(df_combined[df_combined["POS"] == p].drop(["POS"], axis=1))
+
+    except urllib.error.HTTPError:
+        st.warning(f"Stats for GW {current_gw - 1} is not available yet.")
 
 
 if __name__ == "__main__":
