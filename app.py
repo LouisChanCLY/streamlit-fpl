@@ -204,6 +204,12 @@ def main() -> None:  # pylint: disable=too-many-locals
     df_all_players["POS"] = df_all_players["POS"].apply(
         pos_list.position_singular_name_by_id
     )
+    df_all_players["xPoint/Price This GW"] = (
+        df_all_players["xPoint This GW"] / df_all_players["Price"]
+    )
+    df_all_players = df_all_players.sort_values(
+        by="xPoint/Price This GW", ascending=False
+    )
 
     st.subheader(st.session_state["events"].current_event_name)
 
