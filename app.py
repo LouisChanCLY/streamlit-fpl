@@ -282,6 +282,11 @@ def main() -> None:  # pylint: disable=too-many-locals
 
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="FPL Stats", page_icon="⚽", layout="wide")
+    st.set_page_config(
+        page_title="FPL Stats",
+        page_icon="⚽",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
 
     main()
