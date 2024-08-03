@@ -195,6 +195,7 @@ def main() -> None:  # pylint: disable=too-many-locals
             "influence": "Influence",
             "creativity": "Creativity",
             "threat": "Threat",
+            "points_per_game": "Points per Game",
             "selected_by_percent": "Selected by (%)",
         },
     )
