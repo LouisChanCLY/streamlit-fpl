@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Optional, Any
+import pytz
 
 
 class Label(BaseModel):
@@ -29,6 +30,18 @@ class PositionList(BaseModel):
     @property
     def plural_names(self) -> List[str]:
         return [position.plural_name for position in self.positions]
+
+    def position_singular_name_by_id(self, position_id: int) -> Optional[str]:
+        for pos in self.positions:
+            if pos.id == position_id:
+                return pos.singular_name
+        return None
+
+    def position_plural_name_by_id(self, position_id: int) -> Optional[str]:
+        for pos in self.positions:
+            if pos.id == position_id:
+                return pos.plural_name
+        return None
 
 
 class Fixture(BaseModel):
@@ -133,6 +146,22 @@ class Player(BaseModel):
     yellow_cards: int
 
 
+class PlayerList(BaseModel):
+    players: List[Player]
+
+    def player_name_by_id(self, player_id: int) -> Optional[str]:
+        for player in self.players:
+            if player.id == player_id:
+                return player.web_name
+        return None
+
+    def player_photo_by_id(self, player_id: int) -> Optional[str]:
+        for player in self.players:
+            if player.id == player_id:
+                return player.photo
+        return None
+
+
 class Event(BaseModel):
     average_entry_score: float
     chip_plays: List[Any]
@@ -161,6 +190,35 @@ class Event(BaseModel):
     transfers_made: int
 
 
+class EventList(BaseModel):
+    events: List[Event]
+
+    @property
+    def current_event(self) -> Optional[Event]:
+        today = datetime.now(pytz.utc)
+        filtered_event = [event for event in self.events if event.deadline_time > today]
+        if filtered_event:
+            return min(
+                (event for event in self.events if event.deadline_time > today),
+                key=lambda x: x.id,
+            )
+        return None
+
+    @property
+    def current_event_id(self) -> Optional[int]:
+        current_event = self.current_event
+        if current_event:
+            return current_event.id
+        return None
+
+    @property
+    def current_event_name(self) -> Optional[str]:
+        current_event = self.current_event
+        if current_event:
+            return current_event.name
+        return None
+
+
 class Team(BaseModel):
     code: int
     draw: int
@@ -183,3 +241,13 @@ class Team(BaseModel):
     strength_defence_home: int
     strength_defence_away: int
     pulse_id: int
+
+
+class TeamList(BaseModel):
+    teams: List[Team]
+
+    def team_name_by_id(self, team_id: int) -> Optional[str]:
+        for team in self.teams:
+            if team.id == team_id:
+                return team.name
+        return None
