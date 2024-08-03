@@ -19,6 +19,18 @@ class Position(BaseModel):
     element_count: int
 
 
+class PositionList(BaseModel):
+    positions: List[Position]
+
+    @property
+    def singular_names(self) -> List[str]:
+        return [position.singular_name for position in self.positions]
+
+    @property
+    def plural_names(self) -> List[str]:
+        return [position.plural_name for position in self.positions]
+
+
 class Fixture(BaseModel):
     id: int
     event: int
