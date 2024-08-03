@@ -170,7 +170,7 @@ class PlayerList(BaseModel):
         columna_rename_mapping = columna_rename_mapping or {}
         return pd.DataFrame(
             [player.model_dump(include=set(include_fields)) for player in self.players]
-        ).rename(columns=columna_rename_mapping)
+        )[include_fields].rename(columns=columna_rename_mapping)
 
 
 class Event(BaseModel):
