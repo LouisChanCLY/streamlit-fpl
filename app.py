@@ -1,25 +1,28 @@
 """Main Script for FPL Stats."""
 
-from typing import Dict, Optional
+from typing import Dict
 
 import httpx
 import numpy as np
 import pandas as pd
 import streamlit as st
-import urllib
 from constants import (
     POS_ID_TO_NAME,
-    POS_NAME_TO_ID,
-    TEAMS_NAME_TO_ID,
     TEAMS_ID_TO_NAME,
-    TEAM_FULL_NAME_TO_ABBR,
 )
-from models import Event, Player, Team, Position
+from models import (
+    Event,
+    Player,
+    Team,
+    Position,
+    PositionList,
+    PlayerList,
+    EventList,
+    TeamList,
+)
 
 BASE_URL = "https://fantasy.premierleague.com/api"
 STATIC_DATA_URL = BASE_URL + "/bootstrap-static/"
-
-VAASTAV_CSV_URL = "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data/2023-24/gws/gw{gw}.csv"
 
 
 @st.cache_data(ttl="6h")
@@ -44,24 +47,10 @@ def parse_official_stats() -> None:
     positions = [
         Position.model_validate(position) for position in response["element_types"]
     ]
-    st.session_state["teams"] = {team.id: team for team in teams}
-    st.session_state["players"] = {player.id: player for player in players}
-    st.session_state["events"] = {event.id: event for event in events}
-    st.session_state["positions"] = {position.id: position for position in positions}
-
-
-def get_current_gw_id() -> int:
-    if "events" not in st.session_state:
-        parse_official_stats()
-    events: Dict[int, Event] = st.session_state["events"]
-    return min(event.id for event in events.values() if event.is_current)
-
-
-def get_gw(gw_id: int) -> Optional[Event]:
-    if "events" not in st.session_state:
-        parse_official_stats()
-    events: Dict[int, Event] = st.session_state["events"]
-    return events.get(gw_id, None)
+    st.session_state["teams"] = TeamList(teams=teams)
+    st.session_state["players"] = PlayerList(players=players)
+    st.session_state["events"] = EventList(events=events)
+    st.session_state["positions"] = PositionList(positions=positions)
 
 
 def preprocess_players_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -143,24 +132,6 @@ def preprocess_players_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_gw_stats(gw: int):
-    df = pd.read_csv(VAASTAV_CSV_URL.format(gw=gw))
-    df["team"] = df["team"].map(TEAM_FULL_NAME_TO_ABBR)
-
-    df = df.rename(
-        {"name": "Player", "position": "POS", "team": "Team"},
-        axis=1,
-    )
-
-    df = df.set_index("Player")
-
-    return df
-
-
-def increment_stat_gw(increment: int = 1) -> None:
-    st.session_state["stat_gw"] += increment
-
-
 def combine_df(df_filtered: pd.DataFrame, df_gw_stats: pd.DataFrame) -> pd.DataFrame:
     df_combined = df_filtered[
         ["Price Change", "Price", "xPoint This GW", "Dream Team Last Week?"]
@@ -182,101 +153,88 @@ def main() -> None:
     """Render webapp."""
     st.title("FPL Stats")
 
-    if "current_gw" not in st.session_state:
-        current_gw = get_current_gw_id()
-        stat_gw = current_gw - 1
-        st.session_state["current_gw"] = current_gw
-        st.session_state["stat_gw"] = current_gw - 1
-    else:
-        current_gw = st.session_state["current_gw"]
-        stat_gw = st.session_state["stat_gw"]
+    with st.sidebar:
+        st.session_state  # pylint: disable=pointless-statement
 
-    st.subheader(f"Game Week {current_gw}")
+    parse_official_stats()
+    events: EventList = st.session_state["events"]
 
-    pos = st.multiselect(label="Position", options=POS, default=POS)
-    team = st.multiselect(label="Team", options=TEAMS, default=TEAMS)
-    injured = st.checkbox("Include Injured Players?", value=False)
-    unavailable = st.checkbox("Include Unavailable Player?", value=False)
-    doubt = st.checkbox("Include Player in Doubt?", value=False)
-    price_range = st.slider(
-        "Price Range",
-        float(df_all_players["Price"].min()),
-        float(df_all_players["Price"].max()),
-        (float(df_all_players["Price"].min()), float(df_all_players["Price"].max())),
-        step=0.1,
+    st.subheader(events.current_event_name)
+
+    pos = st.multiselect(
+        label="Position",
+        options=st.session_state["positions"].plural_names,
+        default=st.session_state["positions"].plural_names,
     )
+    # team = st.multiselect(label="Team", options=TEAMS, default=TEAMS)
+    # injured = st.checkbox("Include Injured Players?", value=False)
+    # unavailable = st.checkbox("Include Unavailable Player?", value=False)
+    # doubt = st.checkbox("Include Player in Doubt?", value=False)
+    # price_range = st.slider(
+    #     "Price Range",
+    #     float(df_all_players["Price"].min()),
+    #     float(df_all_players["Price"].max()),
+    #     (float(df_all_players["Price"].min()), float(df_all_players["Price"].max())),
+    #     step=0.1,
+    # )
 
-    df_filtered = df_all_players[df_all_players["POS"].isin(pos)]
-    df_filtered = df_filtered[df_filtered["Team"].isin(team)]
+    # df_filtered = df_all_players[df_all_players["POS"].isin(pos)]
+    # df_filtered = df_filtered[df_filtered["Team"].isin(team)]
 
-    try:
-        df_gw_stats = get_gw_stats(stat_gw)
-        df_gw_stats = df_gw_stats[df_gw_stats["POS"].isin(pos)]
-        df_gw_stats = df_gw_stats[df_gw_stats["Team"].isin(team)]
+    # try:
+    #     df_gw_stats = get_gw_stats(stat_gw)
+    #     df_gw_stats = df_gw_stats[df_gw_stats["POS"].isin(pos)]
+    #     df_gw_stats = df_gw_stats[df_gw_stats["Team"].isin(team)]
 
-        if not injured:
-            df_filtered = df_filtered[df_filtered["Status"] != "i"]
+    #     if not injured:
+    #         df_filtered = df_filtered[df_filtered["Status"] != "i"]
 
-        if not unavailable:
-            df_filtered = df_filtered[df_filtered["Status"] != "u"]
+    #     if not unavailable:
+    #         df_filtered = df_filtered[df_filtered["Status"] != "u"]
 
-        if not doubt:
-            df_filtered = df_filtered[df_filtered["Status"] != "d"]
+    #     if not doubt:
+    #         df_filtered = df_filtered[df_filtered["Status"] != "d"]
 
-        df_filtered = df_filtered[
-            (df_filtered["Price"] >= price_range[0])
-            & (df_filtered["Price"] <= price_range[1])
-        ]
+    #     df_filtered = df_filtered[
+    #         (df_filtered["Price"] >= price_range[0])
+    #         & (df_filtered["Price"] <= price_range[1])
+    #     ]
 
-        st.subheader("Stats History")
+    #     st.subheader("Stats History")
 
-        _ = st.columns((1.5, 3, 1.2, 3, 1.5))
-        _[0].button(
-            "⬅️ Previous Game Week",
-            on_click=increment_stat_gw,
-            args=(-1,),
-            disabled=stat_gw <= 1,
-        )
-        _[2].caption(f"Stats from Game Week {stat_gw}")
-        _[-1].button(
-            "Next Game Week ➡️",
-            on_click=increment_stat_gw,
-            disabled=stat_gw >= current_gw - 1,
-        )
+    #     _ = st.columns((1.5, 3, 1.2, 3, 1.5))
+    #     _[0].button(
+    #         "⬅️ Previous Game Week",
+    #         on_click=increment_stat_gw,
+    #         args=(-1,),
+    #         disabled=stat_gw <= 1,
+    #     )
+    #     _[2].caption(f"Stats from Game Week {stat_gw}")
+    #     _[-1].button(
+    #         "Next Game Week ➡️",
+    #         on_click=increment_stat_gw,
+    #         disabled=stat_gw >= current_gw - 1,
+    #     )
 
-        df_combined = combine_df(df_filtered, df_gw_stats)
+    #     df_combined = combine_df(df_filtered, df_gw_stats)
 
-        # Show the df broken down by player positions
-        tabs = st.tabs(POS_NAME_TO_ID.keys())
+    #     # Show the df broken down by player positions
+    #     tabs = st.tabs(POS_NAME_TO_ID.keys())
 
-        for tab, pos in zip(tabs, POS_NAME_TO_ID.keys()):
-            with tab:
-                st.dataframe(
-                    df_combined[df_combined["POS"] == pos].drop(
-                        ["POS"],
-                        axis=1,
-                    )
-                )
+    #     for tab, pos in zip(tabs, POS_NAME_TO_ID.keys()):
+    #         with tab:
+    #             st.dataframe(
+    #                 df_combined[df_combined["POS"] == pos].drop(
+    #                     ["POS"],
+    #                     axis=1,
+    #                 )
+    #             )
 
-    except urllib.error.HTTPError:
-        st.warning(f"Stats for GW {current_gw - 1} is not available yet.")
+    # except urllib.error.HTTPError:
+    #     st.warning(f"Stats for GW {current_gw - 1} is not available yet.")
 
 
 if __name__ == "__main__":
     st.set_page_config(page_title="FPL Stats", page_icon="⚽", layout="wide")
 
-    parse_official_stats()
-
-    with st.sidebar:
-        st.session_state  # pylint: disable=pointless-statement
-
-    st.dataframe(
-        pd.DataFrame(
-            [player.model_dump() for player in st.session_state["players"].values()]
-        )
-    )
-
-    POS = POS_NAME_TO_ID.keys()
-    TEAMS = TEAMS_NAME_TO_ID.keys()
-
-    # main()
+    main()
