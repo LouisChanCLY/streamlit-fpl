@@ -1,7 +1,8 @@
 from datetime import datetime
 from pydantic import BaseModel
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 import pytz
+import pandas as pd
 
 
 class Label(BaseModel):
@@ -161,6 +162,16 @@ class PlayerList(BaseModel):
                 return player.photo
         return None
 
+    def to_dataframe(
+        self,
+        include_fields: List[str],
+        columna_rename_mapping: Optional[Dict[str, str]] = None,
+    ) -> pd.DataFrame:
+        columna_rename_mapping = columna_rename_mapping or {}
+        return pd.DataFrame(
+            [player.model_dump(include=set(include_fields)) for player in self.players]
+        ).rename(columns=columna_rename_mapping)
+
 
 class Event(BaseModel):
     average_entry_score: float
@@ -245,6 +256,10 @@ class Team(BaseModel):
 
 class TeamList(BaseModel):
     teams: List[Team]
+
+    @property
+    def team_names(self) -> List[str]:
+        return [team.name for team in self.teams]
 
     def team_name_by_id(self, team_id: int) -> Optional[str]:
         for team in self.teams:
