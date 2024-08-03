@@ -15,6 +15,7 @@ pyyaml = "^6.0.1"
 pydantic = "^2.8.2"
 pylint-pydantic = "^0.3.2"
 pytz = "^2024.1"
+pandas-stubs = "^2.2.2.240603"
 
 
 [build-system]
