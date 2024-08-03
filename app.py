@@ -245,9 +245,14 @@ def main() -> None:
         # Show the df broken down by player positions
         tabs = st.tabs(POS_NAME_TO_ID.keys())
 
-        for t, p in zip(tabs, POS_NAME_TO_ID.keys()):
-            with t:
-                st.dataframe(df_combined[df_combined["POS"] == p].drop(["POS"], axis=1))
+        for tab, pos in zip(tabs, POS_NAME_TO_ID.keys()):
+            with tab:
+                st.dataframe(
+                    df_combined[df_combined["POS"] == pos].drop(
+                        ["POS"],
+                        axis=1,
+                    )
+                )
 
     except urllib.error.HTTPError:
         st.warning(f"Stats for GW {current_gw - 1} is not available yet.")
@@ -259,7 +264,7 @@ if __name__ == "__main__":
     parse_official_stats()
 
     with st.sidebar:
-        st.session_state
+        st.session_state  # pylint: disable=pointless-statement
 
     st.dataframe(
         pd.DataFrame(
