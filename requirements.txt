@@ -1,0 +1,8 @@
+pandas==2.0.3
+pydantic==2.8.2
+pylint-pydantic==0.3.2
+httpx==0.24.1
+numpy==1.26.4
+streamlit==1.37.0
+streamlit-extras==0.4.3
+pytz==2024.1
