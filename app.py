@@ -236,8 +236,6 @@ def main() -> None:  # pylint: disable=too-many-locals
         format="%.1f M",
     )
 
-    # df_all_players
-
     df_filtered = df_all_players[df_all_players["POS"].isin(position)]
     df_filtered = df_filtered[df_filtered["Team"].isin(team)]
 
