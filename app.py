@@ -6,10 +6,6 @@ import httpx
 import numpy as np
 import pandas as pd
 import streamlit as st
-from constants import (
-    POS_ID_TO_NAME,
-    TEAMS_ID_TO_NAME,
-)
 from models import (
     Event,
     Player,
@@ -59,102 +55,6 @@ def parse_official_stats() -> None:
     st.session_state["positions"] = PositionList(positions=positions)
 
 
-def preprocess_players_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Preprocess official player stats dataframe.
-
-    Args:
-        df (pd.DataFrame): Raw player dataframe
-
-    Returns:
-        pd.DataFrame: Pre-processed player dataframe
-    """
-    df.index = pd.Series(df["first_name"] + " " + df["second_name"], name="Player")
-
-    df["element_type"] = df["element_type"].map(POS_ID_TO_NAME)
-    df["team"] = df["team"].map(TEAMS_ID_TO_NAME)
-
-    df.insert(
-        0,
-        "Price Change",
-        (
-            df["cost_change_event"].apply(np.sign)
-            + df["cost_change_start"].apply(np.sign)
-        )
-        .apply(np.sign)
-        .map({-1: "⬇️", 0: " ", 1: "⬆️"}),
-    )
-
-    df = df.drop(
-        [
-            "id",
-            "code",
-            "photo",
-            "first_name",
-            "second_name",
-            "squad_number",
-            "team_code",
-            "web_name",
-            "chance_of_playing_next_round",
-            "chance_of_playing_this_round",
-            "cost_change_event",
-            "cost_change_event_fall",
-            "cost_change_start",
-            "cost_change_start_fall",
-            "selected_rank",
-            "selected_rank_type",
-            "points_per_game_rank",
-            "points_per_game_rank_type",
-            "form_rank",
-            "form_rank_type",
-            "now_cost_rank",
-            "now_cost_rank_type",
-            "ict_index_rank",
-            "ict_index_rank_type",
-            "threat_rank",
-            "threat_rank_type",
-            "creativity_rank",
-            "creativity_rank_type",
-            "influence_rank",
-            "influence_rank_type",
-        ],
-        axis=1,
-    )
-
-    df = df.rename(
-        {
-            "element_type": "POS",
-            "team": "Team",
-            "status": "Status",
-            "dreamteam_count": "No. Dream Team Entry",
-            "in_dreamteam": "Dream Team Last Week?",
-            "ep_this": "xPoint This GW",
-            "ep_next": "xPoint Next GW",
-            "now_cost": "Price",
-        },
-        axis=1,
-    )
-
-    df["Price"] /= 10
-    return df
-
-
-def combine_df(df_filtered: pd.DataFrame, df_gw_stats: pd.DataFrame) -> pd.DataFrame:
-    df_combined = df_filtered[
-        ["Price Change", "Price", "xPoint This GW", "Dream Team Last Week?"]
-    ].join(df_gw_stats)
-    df_combined = df_combined.rename(
-        {
-            "Price Change": f"Price Change (GW{st.session_state['current_gw'] - 1} to GW{st.session_state['current_gw']})",
-            "Price": f"Price (GW{st.session_state['current_gw']})",
-            "xPoint This GW": f"xPoint (GW{st.session_state['current_gw']})",
-            "Dream Team Last Week?": f"Dream Team GW{st.session_state['current_gw'] - 1}",
-        },
-        axis=1,
-    )
-
-    return df_combined
-
-
 def main() -> None:  # pylint: disable=too-many-locals
     """Render webapp."""
     st.title("FPL Stats")
@@ -183,6 +83,8 @@ def main() -> None:  # pylint: disable=too-many-locals
             "selected_by_percent",
             "points_per_game",
             "form",
+            "cost_change_event",
+            "cost_change_start",
         ],
         columna_rename_mapping={
             "web_name": "Name",
@@ -212,6 +114,17 @@ def main() -> None:  # pylint: disable=too-many-locals
     )
     df_all_players = df_all_players.sort_values(
         by="xPoint/Price This GW", ascending=False
+    )
+
+    df_all_players.insert(
+        9,
+        "Price Change",
+        (
+            df_all_players["cost_change_event"].apply(np.sign)
+            + df_all_players["cost_change_start"].apply(np.sign)
+        )
+        .apply(np.sign)
+        .map({-1: "⬇️", 0: " ", 1: "⬆️"}),
     )
 
     st.subheader(st.session_state["events"].current_event_name)
@@ -289,7 +202,15 @@ def main() -> None:  # pylint: disable=too-many-locals
                 """
             )
             st.dataframe(
-                df_filtered_pos.drop(["POS", "Status"], axis=1),
+                df_filtered_pos.drop(
+                    [
+                        "POS",
+                        "Status",
+                        "cost_change_event",
+                        "cost_change_start",
+                    ],
+                    axis=1,
+                ),
                 hide_index=True,
                 use_container_width=True,
             )
