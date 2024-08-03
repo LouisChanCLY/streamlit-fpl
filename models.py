@@ -1,5 +1,6 @@
+from datetime import datetime
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import List, Optional, Any
 
 
 class Label(BaseModel):
@@ -118,3 +119,31 @@ class Player(BaseModel):
     value_season: float
     web_name: str
     yellow_cards: int
+
+
+class Event(BaseModel):
+    average_entry_score: float
+    chip_plays: List[Any]
+    cup_leagues_created: bool
+    data_checked: bool
+    deadline_time: datetime
+    deadline_time_epoch: int
+    deadline_time_game_offset: int
+    finished: bool
+    h2h_ko_matches_created: bool
+    highest_score: Optional[float]
+    highest_scoring_entry: Optional[Any]
+    id: int
+    is_current: bool
+    is_next: bool
+    is_previous: bool
+    most_captained: Optional[Any]
+    most_selected: Optional[Any]
+    most_transferred_in: Optional[Any]
+    most_vice_captained: Optional[Any]
+    name: str
+    ranked_count: int
+    release_time: Optional[datetime]
+    top_element: Optional[Any]
+    top_element_info: Optional[Any]
+    transfers_made: int
