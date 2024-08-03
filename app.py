@@ -1,6 +1,6 @@
 """Main Script for FPL Stats."""
 
-from typing import Dict
+from typing import Dict, List
 
 import httpx
 import numpy as np
@@ -37,7 +37,7 @@ def get_official_stats() -> Dict:
     return response.json()
 
 
-@st.cache_data(ttl="6h")
+# @st.cache_data(ttl="6h")
 def parse_official_stats() -> None:
 
     response = get_official_stats()
@@ -149,89 +149,129 @@ def combine_df(df_filtered: pd.DataFrame, df_gw_stats: pd.DataFrame) -> pd.DataF
     return df_combined
 
 
-def main() -> None:
+def main() -> None:  # pylint: disable=too-many-locals
     """Render webapp."""
     st.title("FPL Stats")
 
     with st.sidebar:
-        st.session_state  # pylint: disable=pointless-statement
+        st.write(st.session_state)  # pylint: disable=pointless-statement
 
     parse_official_stats()
-    events: EventList = st.session_state["events"]
 
-    st.subheader(events.current_event_name)
-
-    pos = st.multiselect(
-        label="Position",
-        options=st.session_state["positions"].plural_names,
-        default=st.session_state["positions"].plural_names,
+    pos_names: List[str] = st.session_state["positions"].singular_names
+    team_names: List[str] = st.session_state["teams"].team_names
+    team_list: TeamList = st.session_state["teams"]
+    pos_list: PositionList = st.session_state["positions"]
+    df_all_players: pd.DataFrame = st.session_state["players"].to_dataframe(
+        include_fields=[
+            "web_name",
+            "element_type",
+            "team",
+            "status",
+            "in_dreamteam",
+            "dreamteam_count",
+            "ep_this",
+            "ep_next",
+            "now_cost",
+            "ict_index",
+            "influence",
+            "creativity",
+            "threat",
+            "selected_by_percent",
+            "points_per_game",
+            "form",
+        ],
+        columna_rename_mapping={
+            "web_name": "Name",
+            "element_type": "POS",
+            "team": "Team",
+            "status": "Status",
+            "dreamteam_count": "No. Dream Team Entry",
+            "in_dreamteam": "Dream Team Last GW?",
+            "ep_this": "xPoint Last GW",
+            "ep_next": "xPoint This GW",
+            "now_cost": "Price",
+            "ict_index": "ICT",
+            "influence": "Influence",
+            "creativity": "Creativity",
+            "threat": "Threat",
+            "selected_by_percent": "Selected by (%)",
+        },
     )
-    # team = st.multiselect(label="Team", options=TEAMS, default=TEAMS)
-    # injured = st.checkbox("Include Injured Players?", value=False)
-    # unavailable = st.checkbox("Include Unavailable Player?", value=False)
-    # doubt = st.checkbox("Include Player in Doubt?", value=False)
-    # price_range = st.slider(
-    #     "Price Range",
-    #     float(df_all_players["Price"].min()),
-    #     float(df_all_players["Price"].max()),
-    #     (float(df_all_players["Price"].min()), float(df_all_players["Price"].max())),
-    #     step=0.1,
-    # )
+    df_all_players["Price"] /= 10  # FPL treat price as int
+    df_all_players["Team"] = df_all_players["Team"].apply(team_list.team_name_by_id)
+    df_all_players["POS"] = df_all_players["POS"].apply(
+        pos_list.position_singular_name_by_id
+    )
 
-    # df_filtered = df_all_players[df_all_players["POS"].isin(pos)]
-    # df_filtered = df_filtered[df_filtered["Team"].isin(team)]
+    st.subheader(st.session_state["events"].current_event_name)
 
-    # try:
-    #     df_gw_stats = get_gw_stats(stat_gw)
-    #     df_gw_stats = df_gw_stats[df_gw_stats["POS"].isin(pos)]
-    #     df_gw_stats = df_gw_stats[df_gw_stats["Team"].isin(team)]
+    position = st.multiselect(
+        label="Position",
+        options=pos_names,
+        default=pos_names,
+    )
+    team = st.multiselect(
+        label="Team",
+        options=team_names,
+        default=team_names,
+    )
+    injured = st.checkbox("Include Injured Players?", value=False)
+    unavailable = st.checkbox("Include Unavailable Player?", value=False)
+    suspended = st.checkbox("Include Suspended Player?", value=False)
+    doubt = st.checkbox("Include Player in Doubt?", value=False)
+    price_range = st.slider(
+        "Price Range",
+        float(df_all_players["Price"].min()),
+        float(df_all_players["Price"].max()),
+        (
+            float(df_all_players["Price"].min()),
+            float(df_all_players["Price"].max()),
+        ),
+        step=0.1,
+        format="%.1f M",
+    )
 
-    #     if not injured:
-    #         df_filtered = df_filtered[df_filtered["Status"] != "i"]
+    # df_all_players
 
-    #     if not unavailable:
-    #         df_filtered = df_filtered[df_filtered["Status"] != "u"]
+    df_filtered = df_all_players[df_all_players["POS"].isin(position)]
+    df_filtered = df_filtered[df_filtered["Team"].isin(team)]
 
-    #     if not doubt:
-    #         df_filtered = df_filtered[df_filtered["Status"] != "d"]
+    if not injured:
+        df_filtered = df_filtered[df_filtered["Status"] != "i"]
 
-    #     df_filtered = df_filtered[
-    #         (df_filtered["Price"] >= price_range[0])
-    #         & (df_filtered["Price"] <= price_range[1])
-    #     ]
+    if not unavailable:
+        df_filtered = df_filtered[df_filtered["Status"] != "u"]
 
-    #     st.subheader("Stats History")
+    if not suspended:
+        df_filtered = df_filtered[df_filtered["Status"] != "s"]
 
-    #     _ = st.columns((1.5, 3, 1.2, 3, 1.5))
-    #     _[0].button(
-    #         "⬅️ Previous Game Week",
-    #         on_click=increment_stat_gw,
-    #         args=(-1,),
-    #         disabled=stat_gw <= 1,
-    #     )
-    #     _[2].caption(f"Stats from Game Week {stat_gw}")
-    #     _[-1].button(
-    #         "Next Game Week ➡️",
-    #         on_click=increment_stat_gw,
-    #         disabled=stat_gw >= current_gw - 1,
-    #     )
+    if not doubt:
+        df_filtered = df_filtered[df_filtered["Status"] != "d"]
 
-    #     df_combined = combine_df(df_filtered, df_gw_stats)
+    df_filtered = df_filtered[
+        (df_filtered["Price"] >= price_range[0])
+        & (df_filtered["Price"] <= price_range[1])
+    ]
 
-    #     # Show the df broken down by player positions
-    #     tabs = st.tabs(POS_NAME_TO_ID.keys())
+    tabs = st.tabs(position)
+    for tab, pos in zip(tabs, position):
+        with tab:
+            df_filtered_pos = df_filtered[df_filtered["POS"] == pos]
+            st.markdown(
+                f"""
+                ##### Summary Statistics of {pos} that Fits the Selection Criteria
 
-    #     for tab, pos in zip(tabs, POS_NAME_TO_ID.keys()):
-    #         with tab:
-    #             st.dataframe(
-    #                 df_combined[df_combined["POS"] == pos].drop(
-    #                     ["POS"],
-    #                     axis=1,
-    #                 )
-    #             )
+                **Total Number of Players:** {len(df_filtered_pos):,g}
 
-    # except urllib.error.HTTPError:
-    #     st.warning(f"Stats for GW {current_gw - 1} is not available yet.")
+                **Average Price:** {df_filtered_pos["Price"].mean():,.3f}
+                """
+            )
+            st.dataframe(
+                df_filtered_pos.drop(["POS", "Status"], axis=1),
+                hide_index=True,
+                use_container_width=True,
+            )
 
 
 if __name__ == "__main__":
