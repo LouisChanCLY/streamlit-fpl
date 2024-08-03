@@ -14,6 +14,7 @@ streamlit = "^1.26.0"
 pyyaml = "^6.0.1"
 pydantic = "^2.8.2"
 pylint-pydantic = "^0.3.2"
+pytz = "^2024.1"
 
 
 [build-system]
