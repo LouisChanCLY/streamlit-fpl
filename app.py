@@ -264,7 +264,7 @@ def main() -> None:  # pylint: disable=too-many-locals
 
                 **Total Number of Players:** {len(df_filtered_pos):,g}
 
-                **Average Price:** {df_filtered_pos["Price"].mean():,.3f}
+                **Average Price:** {df_filtered_pos["Price"].mean():,.2f}M
                 """
             )
             st.dataframe(
