@@ -20,9 +20,15 @@ from models import (
     EventList,
     TeamList,
 )
+from streamlit_extras.tags import tagger_component
+from datetime import datetime
+import pytz
 
 BASE_URL = "https://fantasy.premierleague.com/api"
 STATIC_DATA_URL = BASE_URL + "/bootstrap-static/"
+
+LDN_TIMEZONE = pytz.timezone("Europe/London")
+HK_TIMEZONE = pytz.timezone("Asia/Hong_Kong")
 
 
 @st.cache_data(ttl="6h")
@@ -209,6 +215,19 @@ def main() -> None:  # pylint: disable=too-many-locals
     )
 
     st.subheader(st.session_state["events"].current_event_name)
+    deadline_time: datetime = st.session_state["events"].current_event.deadline_time
+
+    tagger_component(
+        "Deadline:",
+        [
+            datetime.strftime(
+                deadline_time.astimezone(HK_TIMEZONE), "Hong Kong Time: %Y-%m-%d %H:%M"
+            ),
+            datetime.strftime(
+                deadline_time.astimezone(LDN_TIMEZONE), "London Time: %Y-%m-%d %H:%M"
+            ),
+        ],
+    )
 
     position = st.multiselect(
         label="Position",
