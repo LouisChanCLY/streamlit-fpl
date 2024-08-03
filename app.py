@@ -153,9 +153,6 @@ def main() -> None:  # pylint: disable=too-many-locals
     """Render webapp."""
     st.title("FPL Stats")
 
-    with st.sidebar:
-        st.write(st.session_state)  # pylint: disable=pointless-statement
-
     parse_official_stats()
 
     pos_names: List[str] = st.session_state["positions"].singular_names
