@@ -1,4 +1,5 @@
 """Main Script for FPL Stats."""
+
 from json import loads
 from typing import Dict
 
@@ -16,7 +17,8 @@ from constants import (
     TEAM_FULL_NAME_TO_ABBR,
 )
 
-OFFICIAL_STATS_URL = "https://fantasy.premierleague.com/api/bootstrap-static/"
+BASE_URL = "https://fantasy.premierleague.com/api"
+STATIC_DATA_URL = BASE_URL + "/bootstrap-static/"
 
 VAASTAV_CSV_URL = "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data/2023-24/gws/gw{gw}.csv"
 
@@ -28,8 +30,9 @@ def get_official_stats() -> Dict:
     Returns:
         Dict: official stats
     """
-    response = httpx.get(OFFICIAL_STATS_URL)
-    return loads(response.text)
+    response = httpx.get(STATIC_DATA_URL)
+    response.raise_for_status()
+    return response.json()
 
 
 @st.cache_data(ttl="6h")
