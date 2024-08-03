@@ -1,14 +1,12 @@
 """Main Script for FPL Stats."""
 
-from json import loads
-from typing import Dict
+from typing import Dict, Optional
 
 import httpx
 import numpy as np
 import pandas as pd
 import streamlit as st
 import urllib
-
 from constants import (
     POS_ID_TO_NAME,
     POS_NAME_TO_ID,
@@ -43,29 +41,23 @@ def parse_official_stats() -> None:
     teams = [Team.model_validate(team) for team in response["teams"]]
     players = [Player.model_validate(player) for player in response["elements"]]
     events = [Event.model_validate(event) for event in response["events"]]
-
     st.session_state["teams"] = {team.id: team for team in teams}
     st.session_state["players"] = {player.id: player for player in players}
     st.session_state["events"] = {event.id: event for event in events}
 
 
-@st.cache_data(ttl="6h")
-def get_current_gw() -> int:
-    """Get the current game week from the official stats
+def get_current_gw_id() -> int:
+    if "events" not in st.session_state:
+        parse_official_stats()
+    events: Dict[int, Event] = st.session_state["events"]
+    return min(event.id for event in events.values() if event.is_current)
 
-    Returns:
-        int: 1-based game week count
-    """
 
-    stats = get_official_stats()
-
-    events = stats.get("events", [])
-
-    return max(
-        (_["id"] if not _["finished"] else (_["id"] + 1))
-        for _ in events
-        if _["is_current"]
-    )
+def get_gw(gw_id: int) -> Optional[Event]:
+    if "events" not in st.session_state:
+        parse_official_stats()
+    events: Dict[int, Event] = st.session_state["events"]
+    return events.get(gw_id, None)
 
 
 def preprocess_players_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -165,16 +157,6 @@ def increment_stat_gw(increment: int = 1) -> None:
     st.session_state["stat_gw"] += increment
 
 
-def get_official_df() -> pd.DataFrame:
-    response = get_official_stats()
-
-    df = pd.DataFrame(response["elements"])
-
-    df = preprocess_players_df(df)
-
-    return df
-
-
 def combine_df(df_filtered: pd.DataFrame, df_gw_stats: pd.DataFrame) -> pd.DataFrame:
     df_combined = df_filtered[
         ["Price Change", "Price", "xPoint This GW", "Dream Team Last Week?"]
@@ -197,7 +179,7 @@ def main() -> None:
     st.title("FPL Stats")
 
     if "current_gw" not in st.session_state:
-        current_gw = get_current_gw()
+        current_gw = get_current_gw_id()
         stat_gw = current_gw - 1
         st.session_state["current_gw"] = current_gw
         st.session_state["stat_gw"] = current_gw - 1
@@ -274,9 +256,18 @@ def main() -> None:
 if __name__ == "__main__":
     st.set_page_config(page_title="FPL Stats", page_icon="⚽", layout="wide")
 
+    parse_official_stats()
+
+    with st.sidebar:
+        st.session_state
+
+    st.dataframe(
+        pd.DataFrame(
+            [player.model_dump() for player in st.session_state["players"].values()]
+        )
+    )
+
     POS = POS_NAME_TO_ID.keys()
     TEAMS = TEAMS_NAME_TO_ID.keys()
 
-    df_all_players = get_official_df()
-
-    main()
+    # main()
