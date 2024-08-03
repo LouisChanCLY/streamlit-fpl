@@ -16,6 +16,7 @@ from constants import (
     TEAMS_ID_TO_NAME,
     TEAM_FULL_NAME_TO_ABBR,
 )
+from models import Event, Player, Team
 
 BASE_URL = "https://fantasy.premierleague.com/api"
 STATIC_DATA_URL = BASE_URL + "/bootstrap-static/"
@@ -33,6 +34,19 @@ def get_official_stats() -> Dict:
     response = httpx.get(STATIC_DATA_URL)
     response.raise_for_status()
     return response.json()
+
+
+@st.cache_data(ttl="6h")
+def parse_official_stats() -> None:
+
+    response = get_official_stats()
+    teams = [Team.model_validate(team) for team in response["teams"]]
+    players = [Player.model_validate(player) for player in response["elements"]]
+    events = [Event.model_validate(event) for event in response["events"]]
+
+    st.session_state["teams"] = {team.id: team for team in teams}
+    st.session_state["players"] = {player.id: player for player in players}
+    st.session_state["events"] = {event.id: event for event in events}
 
 
 @st.cache_data(ttl="6h")
